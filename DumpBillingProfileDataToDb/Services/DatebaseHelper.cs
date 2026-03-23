@@ -1,5 +1,6 @@
 ﻿using DumpBillingProfileDataToDb.Entities;
 using DumpBillingProfileDataToDb.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DumpBillingProfileDataToDb.Services;
 
@@ -10,13 +11,13 @@ public class DatebaseHelper : IDataBaseHelper
     {
         _serviceScopeFactoryLocator = serviceScopeFactoryLocator;
     }
-    public async Task<RedisNamePlate> GetNamePlate(string nodeId, int templateId)
+    public async Task<List<NamePlate>> GetNamePlates()
     {
 
         using var scope = _serviceScopeFactoryLocator.CreateScope();
         var repository =
             scope.ServiceProvider
                 .GetService<INamePlateRepository>();
-        return await repository.GetNamePlate(nodeId, templateId);
+        return await repository.GetNamePlates();
     }
 }

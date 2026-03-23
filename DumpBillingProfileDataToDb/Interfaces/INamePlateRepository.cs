@@ -1,9 +1,9 @@
 ﻿using DumpBillingProfileDataToDb.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace DumpBillingProfileDataToDb.Interfaces;
 
-public interface IDataBaseHelper
+public interface INamePlateRepository
 {
-    //Task<RedisNamePlate> GetNamePlate(string nodeId, int templateId);
     Task<List<NamePlate>> GetNamePlates();
 }

@@ -1,0 +1,11 @@
+//{
+//  "profiles": {
+//    "DEV": {
+//      "commandName": "Project",
+//      "environmentVariables": {
+//        "POSTGRESQL_CONNECTION_STRING": "Host=52.66.27.228;Port=5432;Database=fieldappdbdev;UserName=ehesqa_user;Password=xyzxyz;Pooling=true;Minimum Pool Size=1;Maximum Pool Size=2;",
+//        "RUN_HESDB_MIGRATION": "true"
+//      }
+//    }
+//  }
+//}

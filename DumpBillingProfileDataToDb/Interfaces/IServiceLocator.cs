@@ -1,4 +1,6 @@
-﻿namespace DumpBillingProfileDataToDb.Interfaces;
+﻿using Microsoft.Extensions.DependencyInjection;
+
+namespace DumpBillingProfileDataToDb.Interfaces;
 
 public interface IServiceLocator : IDisposable
 {
