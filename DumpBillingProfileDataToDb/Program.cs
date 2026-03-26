@@ -20,6 +20,8 @@ builder.ConfigureServices((context, services) =>
     services.AddScoped<INamePlateRepository, NamePlateRepository>();
     services.AddScoped<IDataBaseHelper, DatebaseHelper>();
     services.AddScoped<IBillingMappingRepository, BillingMappingRepository>();
+    services.AddScoped<IRedisCacheConnect, RedisCacheConnect>();
+    services.AddScoped<IRedisCacheDbContext, RedisCacheDbContext>();
 
     services.AddSingleton<IServiceLocator, ServiceLocator>();
 });
