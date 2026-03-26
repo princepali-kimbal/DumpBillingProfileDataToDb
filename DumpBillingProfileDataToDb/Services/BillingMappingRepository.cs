@@ -9,10 +9,12 @@ namespace DumpBillingProfileDataToDb.Services;
 public class BillingMappingRepository : IBillingMappingRepository
 {
     private readonly IDbContextFactory<PostGresqlDBContext> _context;
+    private readonly IRedisCacheConnect _redisCacheConnect;
 
-    public BillingMappingRepository(IDbContextFactory<PostGresqlDBContext> context)
+    public BillingMappingRepository(IDbContextFactory<PostGresqlDBContext> context, IRedisCacheConnect redisCacheConnect)
     {
         _context = context;
+        _redisCacheConnect = redisCacheConnect;
     }
 
     public async Task DumpBillingProfileDataToRedis()
@@ -114,7 +116,7 @@ public class BillingMappingRepository : IBillingMappingRepository
             try
             {
                 Console.WriteLine(JsonSerializer.Serialize(redisPayload));
-                // await _redisCacheConnect.AddToCacheVEE(redisPayload);
+                 await _redisCacheConnect.AddToCacheVEE(redisPayload);
             }
             catch (Exception ex)
             {
