@@ -8,5 +8,5 @@ public class MeterSubTemplate
     public string ProfileName { get; set; }
     public string ObisCode { get; set; }
 
-    public string DataFormat { get; set; }
+    //public string DataFormat { get; set; }
 }

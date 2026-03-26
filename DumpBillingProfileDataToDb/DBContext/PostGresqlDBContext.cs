@@ -38,6 +38,7 @@ public class PostGresqlDBContext : DbContext
 
             entity.Property(e => e.MeterNumber).HasColumnName("meternumber");
             entity.Property(e => e.MeterCategory).HasColumnName("metercategory");
+            //entity.Property(e => e.MeterTemplateId).HasColumnName("metertemplateid");
         });
 
         modelBuilder.Entity<MeterProfile>(entity =>
@@ -84,10 +85,18 @@ public class PostGresqlDBContext : DbContext
             entity.Property(e => e.MeterCategory).HasColumnName("metercategory");
             entity.Property(e => e.ProfileName).HasColumnName("profilename");
             entity.Property(e => e.ObisCode).HasColumnName("obiscode");
-            entity.Property(e => e.DataFormat).HasColumnName("dataformat");
+            //entity.Property(e => e.DataFormat).HasColumnName("dataformat");
         });
 
-        modelBuilder.Entity<BillingProfileDto>().HasNoKey();
+        modelBuilder.Entity<BillingProfileDto>(entity =>
+        {
+            entity.HasNoKey();
+
+            entity.Property(x => x.Meternumber).HasColumnName("meternumber");
+            entity.Property(x => x.Obisdata).HasColumnName("obisdata");
+            entity.Property(x => x.CreatedAt).HasColumnName("createdat");   // 🔥 IMPORTANT
+            entity.Property(x => x.Rtcdateat).HasColumnName("rtcdateat");
+        });
 
         // 🔴 MeterBillingProfile
         modelBuilder.Entity<MeterBillingProfile>(entity =>

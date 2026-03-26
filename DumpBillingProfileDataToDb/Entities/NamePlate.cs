@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DumpBillingProfileDataToDb.Entities;
+﻿namespace DumpBillingProfileDataToDb.Entities;
 
 public class NamePlate
 {

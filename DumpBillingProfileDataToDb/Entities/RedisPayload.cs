@@ -28,7 +28,7 @@ public class RedisProfileValues
     public string EntityCode { get; set; }
     public string ObisCode { get; set; }
     public string Value { get; set; }
-    public string DataFormat { get; set; }
+    //public string DataFormat { get; set; }
 }
 public class MeterSecurity
 {

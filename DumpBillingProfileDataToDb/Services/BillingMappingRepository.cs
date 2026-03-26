@@ -2,6 +2,7 @@
 using DumpBillingProfileDataToDb.Entities;
 using DumpBillingProfileDataToDb.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace DumpBillingProfileDataToDb.Services;
 
@@ -20,129 +21,90 @@ public class BillingMappingRepository : IBillingMappingRepository
 
         Console.WriteLine("🔄 Loading data...");
 
+        // ✅ 1. Get meters
         var meters = await db.NamePlateWithRegister
             .FromSqlRaw("SELECT meternumber, metercategory FROM meter_nameplate")
             .AsNoTracking()
             .ToListAsync();
 
+        // ✅ 2. Get entities (ONLY required table)
         var entities = await db.MeterEntity
             .Where(x => x.ProfileName == "BILLINGPROFILE")
             .AsNoTracking()
             .ToListAsync();
 
-        var subTemplates = await db.MeterSubTemplate
-            .Where(x => x.ProfileName == "BILLINGPROFILE")
-            .Select(x => new
-            {
-                x.MeterCategory,
-                x.ProfileName,
-                x.ObisCode,
-                x.DataFormat
-            })
-            .ToListAsync();
-
-        // 🔴 Latest billing
-        var billingProfiles = await db.Set<BillingProfileDto>()
-            .FromSqlRaw(@"
-            SELECT DISTINCT ON (meternumber)
-                meternumber,
-                obisdata,
-                createdat
-            FROM meter_billingprofile
-            ORDER BY meternumber, createdat DESC
-        ")
-            .AsNoTracking()
-            .ToListAsync();
-
-        var profileLookup = await db.MeterProfiles
-            .ToDictionaryAsync(x => x.ProfileName, x => x.ProfileId);
-
-        var billingProfileId = profileLookup["BILLINGPROFILE"];
-
-        Console.WriteLine("✅ Data loaded");
-
-        // 🔹 Lookups
+        // ✅ 3. Create lookup (MeterCategory → Entities)
         var entityLookup = entities
             .GroupBy(e => e.MeterCategory)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var billingLookup = billingProfiles
-            .ToDictionary(x => x.Meternumber, x => x);
+        // ✅ 4. Get ProfileId
+        var billingProfileId = await db.MeterProfiles
+            .Where(x => x.ProfileName == "BILLINGPROFILE")
+            .Select(x => x.ProfileId)
+            .FirstAsync();
 
-        var entityKeyLookup = entities.ToDictionary(
-            e => e,
-            e => $"{e.MeterCategory}_BILLINGPROFILE_{e.ObisCode}"
-        );
-
-        var subTemplateLookup = subTemplates
-            .GroupBy(x => new { x.MeterCategory, x.ProfileName, x.ObisCode })
-            .ToDictionary(
-                g => $"{g.Key.MeterCategory}_{g.Key.ProfileName}_{g.Key.ObisCode}",
-                g => g.Select(x => x.DataFormat).Where(x => x != null).Distinct().ToList()
-            );
-
-        Console.WriteLine("🚀 Processing & pushing to Redis...");
+        Console.WriteLine("✅ Data loaded");
+        Console.WriteLine("🚀 Processing...");
 
         int count = 0;
 
         foreach (var meter in meters)
         {
-            if (!billingLookup.TryGetValue(meter.MeterNumber, out var billing))
-                continue;
+            // ✅ 5. Get latest billing PER meter (FAST)
+            var billing = await db.Set<BillingProfileDto>()
+                .FromSqlRaw(@"
+                    SELECT meternumber, obisdata, rtcdateat, createdat
+                    FROM meter_billingprofile
+                    WHERE meternumber = {0}
+                    ORDER BY rtcdateat DESC
+                    LIMIT 1
+                ", meter.MeterNumber)
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
 
             if (billing == null || string.IsNullOrEmpty(billing.Obisdata))
                 continue;
 
+            // ✅ 6. Parse OBIS
             var parsed = ParseObisData(billing.Obisdata);
-
-            foreach (var kv in parsed)
-            {
-                Console.WriteLine($"Parsed Key: {kv.Key}, Value: {kv.Value}");
-            }
 
             if (!entityLookup.TryGetValue(meter.MeterCategory, out var meterEntities))
                 continue;
 
             var redisValues = new List<RedisProfileValues>();
 
+            // ✅ 7. Mapping (IMPORTANT LOGIC)
             foreach (var entity in meterEntities)
             {
                 if (!parsed.TryGetValue(entity.ObisId, out var value))
                     continue;
 
-                var key = entityKeyLookup[entity];
-
-                if (!subTemplateLookup.TryGetValue(key, out var formats))
-                    continue;
-
-                foreach (var format in formats)
+                redisValues.Add(new RedisProfileValues
                 {
-                    redisValues.Add(new RedisProfileValues
-                    {
-                        EntityCode = entity.EntityCode,
-                        ObisCode = entity.ObisCode,
-                        Value = value,
-                        DataFormat = format
-                    });
-                }
+                    EntityCode = entity.EntityCode,
+                    ObisCode = entity.ObisCode,
+                    Value = value,
+                });
             }
 
             if (redisValues.Count == 0)
                 continue;
 
+            // ✅ 8. Redis Key
             var redisKey = $"{meter.MeterNumber}_{meter.MeterCategory}_{billingProfileId}";
 
-            // 🔴 PRINT BEFORE INSERT
+            // 🔴 DEBUG PRINT
             Console.WriteLine("=================================");
             Console.WriteLine($"KEY: {redisKey}");
             Console.WriteLine($"VALUES COUNT: {redisValues.Count}");
 
-            foreach (var v in redisValues.Take(5)) // print only few to avoid spam
+            foreach (var v in redisValues.Take(3))
             {
-                Console.WriteLine($"{v.EntityCode} | {v.ObisCode} | {v.Value} | {v.DataFormat}");
+                Console.WriteLine($"{v.EntityCode} | {v.ObisCode} | {v.Value}");
             }
 
-            // 🔴 CREATE PAYLOAD
+            // ✅ 9. Payload
             var redisPayload = new RedisPayload
             {
                 Key = redisKey,
@@ -151,22 +113,21 @@ public class BillingMappingRepository : IBillingMappingRepository
 
             try
             {
-                //await _redisCacheConnect.AddToCacheVEE(redisPayload);
+                Console.WriteLine(JsonSerializer.Serialize(redisPayload));
+                // await _redisCacheConnect.AddToCacheVEE(redisPayload);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Redis error for {redisKey}: {ex.Message}");
+                Console.WriteLine($"❌ Redis error: {ex.Message}");
             }
 
             count++;
 
             if (count % 1000 == 0)
-            {
                 Console.WriteLine($"✅ Processed {count} meters...");
-            }
         }
 
-        Console.WriteLine($"🎉 Completed! Total meters pushed: {count}");
+        Console.WriteLine($"🎉 Completed! Total meters: {count}");
     }
 
     // 🔵 Helper
